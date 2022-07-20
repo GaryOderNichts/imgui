@@ -20,10 +20,15 @@ int main(int, char**)
     WHBProcInit();
     WHBGfxInit();
 
+    // Initialize KPAD and enable Pro Controller
+    KPADInit();
+    WPADEnableURCC(TRUE);
+
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
@@ -49,11 +54,23 @@ int main(int, char**)
     // Main loop
     while (WHBProcIsRunning())
     {
-        VPADStatus vpad;
-        VPADRead(VPAD_CHAN_0, &vpad, 1, nullptr);
-
         ImGui_ImplWiiU_ControllerInput input;
-        input.vpad = &vpad;
+
+        VPADStatus vpad;
+        VPADReadError vpad_error;
+        VPADRead(VPAD_CHAN_0, &vpad, 1, &vpad_error);
+        if (vpad_error == VPAD_READ_SUCCESS)
+            input.vpad = &vpad;
+
+        KPADStatus status[4];
+        for (int i = 0; i < 4; i++)
+        {
+            KPADError kpad_error;
+            KPADReadEx((KPADChan) i, &status[i], 1, &kpad_error);
+            if (kpad_error == KPAD_ERROR_OK)
+                input.kpad[i] = &status[i];
+        }
+
         ImGui_ImplWiiU_ProcessInput(&input);
 
         // Start a new frame / We'll be using the TV buffer
@@ -114,8 +131,8 @@ int main(int, char**)
         GX2SetScissor(0, 0, io.DisplaySize.x, io.DisplaySize.y);
         ImGui_ImplWiiU_DrawKeyboardOverlay(true);
 
+        // Copy the TV buffer to the scanbuffers
         WHBGfxFinishRenderTV();
-        // Copy the TV buffer to the drc as well
         GX2CopyColorBufferToScanBuffer(WHBGfxGetTVColourBuffer(), GX2_SCAN_TARGET_DRC);
 
         WHBGfxFinishRender();

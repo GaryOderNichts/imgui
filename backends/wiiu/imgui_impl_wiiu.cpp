@@ -33,6 +33,7 @@ bool     ImGui_ImplWiiU_Init()
     ImGui_ImplWiiU_Data* bd = IM_NEW(ImGui_ImplWiiU_Data)();
     io.BackendPlatformUserData = (void*)bd;
     io.BackendPlatformName = "imgui_impl_wiiu";
+    io.BackendFlags |= ImGuiBackendFlags_HasGamepad;
 
     // Initialize and create software keyboard
     nn::swkbd::CreateArg createArg;
@@ -83,6 +84,9 @@ void     ImGui_ImplWiiU_Shutdown()
 
 static void ImGui_ImplWiiU_UpdateKeyboardInput(ImGui_ImplWiiU_ControllerInput* input)
 {
+    if (!input->vpad)
+        return;
+
     ImGuiIO& io = ImGui::GetIO();
 
     VPADGetTPCalibratedPoint(VPAD_CHAN_0, &input->vpad->tpNormal, &input->vpad->tpNormal);
@@ -117,6 +121,9 @@ static void ImGui_ImplWiiU_UpdateKeyboardInput(ImGui_ImplWiiU_ControllerInput* i
 
 static void ImGui_ImplWiiU_UpdateTouchInput(ImGui_ImplWiiU_ControllerInput* input)
 {
+    if (!input->vpad)
+        return;
+
     ImGui_ImplWiiU_Data* bd = ImGui_ImplWiiU_GetBackendData();
     ImGuiIO& io = ImGui::GetIO();
 
@@ -137,9 +144,87 @@ static void ImGui_ImplWiiU_UpdateTouchInput(ImGui_ImplWiiU_ControllerInput* inpu
     }
 }
 
+#define IM_CLAMP(V, MN, MX)     ((V) < (MN) ? (MN) : (V) > (MX) ? (MX) : (V))
+
 static void ImGui_ImplWiiU_UpdateControllerInput(ImGui_ImplWiiU_ControllerInput* input)
 {
+    ImGuiIO& io = ImGui::GetIO();
+    if ((io.ConfigFlags & ImGuiConfigFlags_NavEnableGamepad) == 0)
+        return;
 
+    uint32_t vpad_buttons = input->vpad ? input->vpad->hold : 0;
+    uint32_t wpad_buttons = 0;
+    uint32_t classic_buttons = 0;
+    uint32_t pro_buttons = 0;
+
+    float stick_l_x = input->vpad ? input->vpad->leftStick.x : 0.0f;
+    float stick_l_y = input->vpad ? input->vpad->leftStick.y : 0.0f;
+    float stick_r_x = input->vpad ? input->vpad->rightStick.x : 0.0f;
+    float stick_r_y = input->vpad ? input->vpad->rightStick.y : 0.0f;
+
+    for (int i = 0; i < 4; i++)
+    {
+        KPADStatus* kpad = input->kpad[i];
+        if (!kpad)
+            continue;
+
+        switch (kpad->extensionType)
+        {
+        case WPAD_EXT_CORE:
+        case WPAD_EXT_NUNCHUK:
+        case WPAD_EXT_MPLUS:
+        case WPAD_EXT_MPLUS_NUNCHUK:
+            wpad_buttons |= kpad->hold;
+            break;
+        case WPAD_EXT_CLASSIC:
+            classic_buttons |= kpad->classic.hold;
+            stick_l_x += kpad->classic.leftStick.x;
+            stick_l_y += kpad->classic.leftStick.y;
+            stick_r_x += kpad->classic.rightStick.x;
+            stick_r_y += kpad->classic.rightStick.y;
+            break;
+        case WPAD_EXT_PRO_CONTROLLER:
+            pro_buttons |= kpad->pro.hold;
+            stick_l_x += kpad->pro.leftStick.x;
+            stick_l_y += kpad->pro.leftStick.y;
+            stick_r_x += kpad->pro.rightStick.x;
+            stick_r_y += kpad->pro.rightStick.y;
+            break;
+        }
+    }
+
+    io.AddKeyEvent(ImGuiKey_GamepadStart, (vpad_buttons & VPAD_BUTTON_PLUS) || (wpad_buttons & WPAD_BUTTON_PLUS) || (classic_buttons & WPAD_CLASSIC_BUTTON_PLUS) || (pro_buttons & WPAD_PRO_BUTTON_PLUS));
+    io.AddKeyEvent(ImGuiKey_GamepadBack, (vpad_buttons & VPAD_BUTTON_MINUS) || (wpad_buttons & WPAD_BUTTON_MINUS) || (classic_buttons & WPAD_CLASSIC_BUTTON_MINUS) || (pro_buttons & WPAD_PRO_BUTTON_MINUS));
+    io.AddKeyEvent(ImGuiKey_GamepadFaceLeft, (vpad_buttons & VPAD_BUTTON_Y) || (classic_buttons & WPAD_CLASSIC_BUTTON_Y) || (pro_buttons & WPAD_PRO_BUTTON_Y));
+    io.AddKeyEvent(ImGuiKey_GamepadFaceRight, (vpad_buttons & VPAD_BUTTON_A) || (wpad_buttons & WPAD_BUTTON_A) || (classic_buttons & WPAD_CLASSIC_BUTTON_A) || (pro_buttons & WPAD_PRO_BUTTON_A));
+    io.AddKeyEvent(ImGuiKey_GamepadFaceUp, (vpad_buttons & VPAD_BUTTON_X) || (classic_buttons & WPAD_CLASSIC_BUTTON_X) || (pro_buttons & WPAD_PRO_BUTTON_X));
+    io.AddKeyEvent(ImGuiKey_GamepadFaceDown, (vpad_buttons & VPAD_BUTTON_B) || (wpad_buttons & WPAD_BUTTON_B) || (classic_buttons & WPAD_CLASSIC_BUTTON_B) || (pro_buttons & WPAD_PRO_BUTTON_B));
+    io.AddKeyEvent(ImGuiKey_GamepadDpadLeft, (vpad_buttons & VPAD_BUTTON_LEFT) || (wpad_buttons & WPAD_BUTTON_LEFT) || (classic_buttons & WPAD_CLASSIC_BUTTON_LEFT) || (pro_buttons & WPAD_PRO_BUTTON_LEFT));
+    io.AddKeyEvent(ImGuiKey_GamepadDpadRight, (vpad_buttons & VPAD_BUTTON_RIGHT) || (wpad_buttons & WPAD_BUTTON_RIGHT) || (classic_buttons & WPAD_CLASSIC_BUTTON_RIGHT) || (pro_buttons & WPAD_PRO_BUTTON_RIGHT));
+    io.AddKeyEvent(ImGuiKey_GamepadDpadUp, (vpad_buttons & VPAD_BUTTON_UP) || (wpad_buttons & WPAD_BUTTON_UP) || (classic_buttons & WPAD_CLASSIC_BUTTON_UP) || (pro_buttons & WPAD_PRO_BUTTON_UP));
+    io.AddKeyEvent(ImGuiKey_GamepadDpadDown, (vpad_buttons & VPAD_BUTTON_DOWN) || (wpad_buttons & WPAD_BUTTON_DOWN) || (classic_buttons & WPAD_CLASSIC_BUTTON_DOWN) || (pro_buttons & WPAD_PRO_BUTTON_DOWN));
+    io.AddKeyEvent(ImGuiKey_GamepadL1, (vpad_buttons & VPAD_BUTTON_L) || (classic_buttons & WPAD_CLASSIC_BUTTON_L) || (pro_buttons & WPAD_PRO_TRIGGER_L));
+    io.AddKeyEvent(ImGuiKey_GamepadR1, (vpad_buttons & VPAD_BUTTON_R) || (classic_buttons & WPAD_CLASSIC_BUTTON_R) || (pro_buttons & WPAD_PRO_TRIGGER_R));
+    io.AddKeyEvent(ImGuiKey_GamepadL2, (vpad_buttons & VPAD_BUTTON_ZL) || (classic_buttons & WPAD_CLASSIC_BUTTON_ZL) || (pro_buttons & WPAD_PRO_TRIGGER_ZL));
+    io.AddKeyEvent(ImGuiKey_GamepadR2, (vpad_buttons & VPAD_BUTTON_ZR) || (classic_buttons & WPAD_CLASSIC_BUTTON_ZR) || (pro_buttons & WPAD_PRO_TRIGGER_ZR));
+    io.AddKeyEvent(ImGuiKey_GamepadL3, (vpad_buttons & VPAD_BUTTON_STICK_L) || (pro_buttons & WPAD_PRO_BUTTON_STICK_L));
+    io.AddKeyEvent(ImGuiKey_GamepadR3, (vpad_buttons & VPAD_BUTTON_STICK_R) || (pro_buttons & WPAD_PRO_BUTTON_STICK_R));
+
+    stick_l_x = IM_CLAMP(stick_l_x, -1.0f, 1.0f);
+    io.AddKeyAnalogEvent(ImGuiKey_GamepadLStickLeft, stick_l_x < -0.1f, (stick_l_x < -0.1f) ? (stick_l_x * -1.0f) : 0.0f);
+    io.AddKeyAnalogEvent(ImGuiKey_GamepadLStickRight, stick_l_x > 0.1f, (stick_l_x > 0.1f) ? stick_l_x : 0.0f);
+
+    stick_l_y = IM_CLAMP(stick_l_y, -1.0f, 1.0f);
+    io.AddKeyAnalogEvent(ImGuiKey_GamepadLStickUp, stick_l_y > 0.1f, (stick_l_y > 0.1f) ? stick_l_y : 0.0f);
+    io.AddKeyAnalogEvent(ImGuiKey_GamepadLStickDown, stick_l_y < -0.1f, (stick_l_y < -0.1f) ? (stick_l_y * -1.0f) : 0.0f);
+
+    stick_r_x = IM_CLAMP(stick_r_x, -1.0f, 1.0f);
+    io.AddKeyAnalogEvent(ImGuiKey_GamepadRStickLeft, stick_r_x < -0.1f, (stick_r_x < -0.1f) ? (stick_r_x * -1.0f) : 0.0f);
+    io.AddKeyAnalogEvent(ImGuiKey_GamepadRStickRight, stick_r_x > 0.1f, (stick_r_x > 0.1f) ? stick_r_x : 0.0f);
+
+    stick_r_y = IM_CLAMP(stick_r_y, -1.0f, 1.0f);
+    io.AddKeyAnalogEvent(ImGuiKey_GamepadRStickUp, stick_r_y > 0.1f, (stick_r_y > 0.1f) ? stick_r_y : 0.0f);
+    io.AddKeyAnalogEvent(ImGuiKey_GamepadRStickDown, stick_r_y < -0.1f, (stick_r_y < -0.1f) ? (stick_r_y * -1.0f) : 0.0f);
 }
 
 bool     ImGui_ImplWiiU_ProcessInput(ImGui_ImplWiiU_ControllerInput* input)

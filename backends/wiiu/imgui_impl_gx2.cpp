@@ -19,8 +19,8 @@
 // GX2 Texture / contains a texture and sampler
 struct ImGui_ImplGX2_Texture
 {
-    GX2Texture texture;
-    GX2Sampler sampler;
+    GX2Texture Texture;
+    GX2Sampler Sampler;
 
     ImGui_ImplGX2_Texture() { memset(this, 0, sizeof(*this)); }
 };
@@ -40,8 +40,7 @@ struct ImGui_ImplGX2_Data
     ImGui_ImplGX2_Data() { memset(this, 0, sizeof(*this)); }
 };
 
-// Backend data stored in io.BackendRendererUserData to allow support for multiple Dear ImGui contexts
-// It is STRONGLY preferred that you use docking branch with multi-viewports (== single Dear ImGui context + multiple windows) instead of multiple Dear ImGui contexts.
+// Backend data stored in io.BackendRendererUserData
 static ImGui_ImplGX2_Data* ImGui_ImplGX2_GetBackendData()
 {
     return ImGui::GetCurrentContext() ? (ImGui_ImplGX2_Data*)ImGui::GetIO().BackendRendererUserData : NULL;
@@ -77,7 +76,7 @@ void    ImGui_ImplGX2_Shutdown()
 void    ImGui_ImplGX2_NewFrame()
 {
     ImGui_ImplGX2_Data* bd = ImGui_ImplGX2_GetBackendData();
-    IM_ASSERT(bd != NULL && "Did you call ImGui_ImplOpenGL3_Init()?");
+    IM_ASSERT(bd != NULL && "Did you call ImGui_ImplGX2_Init()?");
 
     if (!bd->ShaderGroup)
         ImGui_ImplGX2_CreateDeviceObjects();
@@ -211,8 +210,8 @@ void    ImGui_ImplGX2_RenderDrawData(ImDrawData* draw_data)
                 // Bind texture, Draw
                 ImGui_ImplGX2_Texture* tex = (ImGui_ImplGX2_Texture*) pcmd->GetTexID();
 
-                GX2SetPixelTexture(&tex->texture, 0);
-                GX2SetPixelSampler(&tex->sampler, 0);
+                GX2SetPixelTexture(&tex->Texture, 0);
+                GX2SetPixelSampler(&tex->Sampler, 0);
 
                 GX2DrawIndexedEx(GX2_PRIMITIVE_MODE_TRIANGLES, pcmd->ElemCount,
                     sizeof(ImDrawIdx) == 2 ? GX2_INDEX_TYPE_U16 : GX2_INDEX_TYPE_U32,
@@ -242,7 +241,7 @@ bool ImGui_ImplGX2_CreateFontsTexture()
 
     bd->FontTexture = IM_NEW(ImGui_ImplGX2_Texture)();
 
-    GX2Texture* tex = &bd->FontTexture->texture;
+    GX2Texture* tex = &bd->FontTexture->Texture;
     memset(tex, 0, sizeof(GX2Texture));
 
     tex->surface.dim = GX2_SURFACE_DIM_TEXTURE_2D;
@@ -270,7 +269,7 @@ bool ImGui_ImplGX2_CreateFontsTexture()
 
     GX2RUnlockSurfaceEx(&tex->surface, 0, GX2R_RESOURCE_BIND_NONE);
 
-    GX2InitSampler(&bd->FontTexture->sampler, GX2_TEX_CLAMP_MODE_CLAMP, GX2_TEX_XY_FILTER_MODE_LINEAR);
+    GX2InitSampler(&bd->FontTexture->Sampler, GX2_TEX_CLAMP_MODE_CLAMP, GX2_TEX_XY_FILTER_MODE_LINEAR);
 
     // Store our identifier
     io.Fonts->SetTexID((ImTextureID) bd->FontTexture);
@@ -284,10 +283,10 @@ void ImGui_ImplGX2_DestroyFontsTexture()
     ImGui_ImplGX2_Data* bd = ImGui_ImplGX2_GetBackendData();
     if (bd->FontTexture)
     {
-        GX2RDestroySurfaceEx(&bd->FontTexture->texture.surface, GX2R_RESOURCE_BIND_NONE);
+        GX2RDestroySurfaceEx(&bd->FontTexture->Texture.surface, GX2R_RESOURCE_BIND_NONE);
         io.Fonts->SetTexID(0);
         IM_DELETE(bd->FontTexture);
-        bd->FontTexture = nullptr;
+        bd->FontTexture = NULL;
     }
 }
 
@@ -296,7 +295,8 @@ bool    ImGui_ImplGX2_CreateDeviceObjects()
     ImGui_ImplGX2_Data* bd = ImGui_ImplGX2_GetBackendData();
     bd->ShaderGroup = IM_NEW(WHBGfxShaderGroup)();
 
-    if (!WHBGfxLoadGFDShaderGroup(bd->ShaderGroup, 0, shader_gsh)) {
+    if (!WHBGfxLoadGFDShaderGroup(bd->ShaderGroup, 0, shader_gsh))
+    {
         IM_DELETE(bd->ShaderGroup);
         return false;
     }
@@ -305,7 +305,8 @@ bool    ImGui_ImplGX2_CreateDeviceObjects()
     WHBGfxInitShaderAttribute(bd->ShaderGroup, "UV", 0, 8, GX2_ATTRIB_FORMAT_FLOAT_32_32);
     WHBGfxInitShaderAttribute(bd->ShaderGroup, "Color", 0, 16, GX2_ATTRIB_TYPE_8_8_8_8);
 
-    if (!WHBGfxInitFetchShader(bd->ShaderGroup)) {
+    if (!WHBGfxInitFetchShader(bd->ShaderGroup))
+    {
         IM_DELETE(bd->ShaderGroup);
         return false;
     }
@@ -320,14 +321,14 @@ void    ImGui_ImplGX2_DestroyDeviceObjects()
     ImGui_ImplGX2_Data* bd = ImGui_ImplGX2_GetBackendData();
 
     free(bd->VertexBuffer);
-    bd->VertexBuffer = nullptr;
+    bd->VertexBuffer = NULL;
 
     free(bd->IndexBuffer);
-    bd->IndexBuffer = nullptr;
+    bd->IndexBuffer = NULL;
 
     WHBGfxFreeShaderGroup(bd->ShaderGroup);
     IM_DELETE(bd->ShaderGroup);
-    bd->ShaderGroup = nullptr;
+    bd->ShaderGroup = NULL;
 
     ImGui_ImplGX2_DestroyFontsTexture();
 }

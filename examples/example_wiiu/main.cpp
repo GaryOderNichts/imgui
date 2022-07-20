@@ -3,6 +3,7 @@
 // ImGui includes
 #include "imgui.h"
 #include "imgui_impl_gx2.h"
+#include "imgui_impl_wiiu.h"
 
 // Graphics includes
 #include <whb/gfx.h>
@@ -28,11 +29,11 @@ int main(int, char**)
     ImGui::StyleColorsDark();
     //ImGui::StyleColorsClassic();
 
-    // Setup Renderer backends
+    // Setup platform and renderer backends
+    ImGui_ImplWiiU_Init();
     ImGui_ImplGX2_Init();
 
     // Our state
-    bool was_touched = false;
     bool show_demo_window = true;
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -45,35 +46,24 @@ int main(int, char**)
     // Main loop
     while (WHBProcIsRunning())
     {
-        // Start a new frame / We'll be using the TV buffer
-        WHBGfxBeginRender();
-        WHBGfxBeginRenderTV();
-
         VPADStatus vpad;
         VPADRead(VPAD_CHAN_0, &vpad, 1, nullptr);
 
-        VPADTouchData touch;
-        VPADGetTPCalibratedPoint(VPAD_CHAN_0, &touch, &vpad.tpNormal);
+        ImGui_ImplWiiU_ControllerInput input;
+        input.vpad = &vpad;
+        ImGui_ImplWiiU_ProcessInput(&input);
 
-        if (touch.touched) {
-            float scale_x = (io.DisplaySize.x / io.DisplayFramebufferScale.x) / 1280.0f;
-            float scale_y = (io.DisplaySize.y / io.DisplayFramebufferScale.y) / 720.0f;
-            io.AddMousePosEvent(touch.x * scale_x, touch.y * scale_y);
-        }
-
-        if (touch.touched != was_touched) {
-            io.AddMouseButtonEvent(0, touch.touched);
-            was_touched = touch.touched;
-        }
+        // Start a new frame / We'll be using the TV buffer
+        WHBGfxBeginRender();
+        WHBGfxBeginRenderTV();
 
         // Start the Dear ImGui frame
         ImGui_ImplGX2_NewFrame();
         ImGui::NewFrame();
 
         // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-        if (show_demo_window) {
+        if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
-        }
 
         // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
         {
@@ -110,15 +100,19 @@ int main(int, char**)
 
         // Rendering
         ImGui::Render();
-        float display_w = (float)WHBGfxGetTVColourBuffer()->surface.width;
-        float display_h = (float)WHBGfxGetTVColourBuffer()->surface.height;
-        GX2SetViewport(0, 0, display_w, display_h, 1.0f, 0.0f);
+        GX2SetViewport(0, 0, io.DisplaySize.x, io.DisplaySize.y, 0.0f, 1.0f);
         WHBGfxClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
 
+        // Render draw data
         ImGui_ImplGX2_RenderDrawData(ImGui::GetDrawData());
 
+        // Render keyboard overlay
+        GX2SetViewport(0, 0, io.DisplaySize.x, io.DisplaySize.y, 0.0f, 1.0f);
+        GX2SetScissor(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+        ImGui_ImplWiiU_DrawKeyboardOverlay(true);
+
         WHBGfxFinishRenderTV();
-        // copy the tv buffer to the drc as well
+        // Copy the TV buffer to the drc as well
         GX2CopyColorBufferToScanBuffer(WHBGfxGetTVColourBuffer(), GX2_SCAN_TARGET_DRC);
 
         WHBGfxFinishRender();
@@ -126,6 +120,7 @@ int main(int, char**)
 
     // Cleanup
     ImGui_ImplGX2_Shutdown();
+    ImGui_ImplWiiU_Shutdown();
     ImGui::DestroyContext();
 
     WHBGfxShutdown();

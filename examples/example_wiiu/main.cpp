@@ -29,6 +29,10 @@ int main(int, char**)
     ImGui::StyleColorsDark();
     //ImGui::StyleColorsClassic();
 
+    // Scale everything by 2 for the Wii U
+    ImGui::GetStyle().ScaleAllSizes(2.0f);
+    io.FontGlobalScale = 2.0f;
+
     // Setup platform and renderer backends
     ImGui_ImplWiiU_Init();
     ImGui_ImplGX2_Init();
@@ -41,7 +45,6 @@ int main(int, char**)
     // Setup display sizes and scales
     io.DisplaySize.x = (float)WHBGfxGetTVColourBuffer()->surface.width; // set the current display width
     io.DisplaySize.y = (float)WHBGfxGetTVColourBuffer()->surface.height; // set the current display height here
-    io.DisplayFramebufferScale = ImVec2(2.0f, 2.0f);
 
     // Main loop
     while (WHBProcIsRunning())

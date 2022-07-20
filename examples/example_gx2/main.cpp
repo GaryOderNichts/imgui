@@ -1,12 +1,17 @@
 // Dear ImGui: standalone example application for the Wii U
+
+// ImGui includes
 #include "imgui.h"
 #include "imgui_impl_gx2.h"
-#include <stdio.h>
 
+// Graphics includes
 #include <whb/gfx.h>
 #include <whb/proc.h>
 #include <gx2/registers.h>
 #include <gx2/swap.h>
+
+// Input includes
+#include <vpad/input.h>
 
 int main(int, char**)
 {
@@ -27,9 +32,15 @@ int main(int, char**)
     ImGui_ImplGX2_Init();
 
     // Our state
+    bool was_touched = false;
     bool show_demo_window = true;
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+    // Setup display sizes and scales
+    io.DisplaySize.x = (float)WHBGfxGetTVColourBuffer()->surface.width; // set the current display width
+    io.DisplaySize.y = (float)WHBGfxGetTVColourBuffer()->surface.height; // set the current display height here
+    io.DisplayFramebufferScale = ImVec2(2.0f, 2.0f);
 
     // Main loop
     while (WHBProcIsRunning())
@@ -38,8 +49,22 @@ int main(int, char**)
         WHBGfxBeginRender();
         WHBGfxBeginRenderTV();
 
-        io.DisplaySize.x = (float)WHBGfxGetTVColourBuffer()->surface.width; // set the current display width
-        io.DisplaySize.y = (float)WHBGfxGetTVColourBuffer()->surface.height; // set the current display height here
+        VPADStatus vpad;
+        VPADRead(VPAD_CHAN_0, &vpad, 1, nullptr);
+
+        VPADTouchData touch;
+        VPADGetTPCalibratedPoint(VPAD_CHAN_0, &touch, &vpad.tpNormal);
+
+        if (touch.touched) {
+            float scale_x = (io.DisplaySize.x / io.DisplayFramebufferScale.x) / 1280.0f;
+            float scale_y = (io.DisplaySize.y / io.DisplayFramebufferScale.y) / 720.0f;
+            io.AddMousePosEvent(touch.x * scale_x, touch.y * scale_y);
+        }
+
+        if (touch.touched != was_touched) {
+            io.AddMouseButtonEvent(0, touch.touched);
+            was_touched = touch.touched;
+        }
 
         // Start the Dear ImGui frame
         ImGui_ImplGX2_NewFrame();

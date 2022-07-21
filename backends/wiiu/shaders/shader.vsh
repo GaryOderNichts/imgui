@@ -28,20 +28,16 @@
 ; $ATTRIB_VARS[2].location = 2
 
 00 CALL_FS NO_BARRIER
-01 ALU: ADDR(32) CNT(18)
+01 ALU: ADDR(32) CNT(14)
     0  x: MUL    ____,   1.0f, C3.x
        y: MUL    ____,   1.0f, C3.y
        z: MUL    ____,   1.0f, C3.z
        w: MUL    ____,   1.0f, C3.w
-    1  x: MULADD R127.x, 0.0f, C2.x, PV0.x
-       y: MULADD R127.y, 0.0f, C2.y, PV0.y
-       z: MULADD R127.z, 0.0f, C2.z, PV0.z
-       w: MULADD R127.w, 0.0f, C2.w, PV0.w
-    2  x: MULADD R127.x, R1.y, C1.x, PV0.x
+    1  x: MULADD R127.x, R1.y, C1.x, PV0.x
        y: MULADD R127.y, R1.y, C1.y, PV0.y
        z: MULADD R127.z, R1.y, C1.z, PV0.z
        w: MULADD R127.w, R1.y, C1.w, PV0.w
-    3  x: MULADD R1.x,   R1.x, C0.x, PV0.x
+    2  x: MULADD R1.x,   R1.x, C0.x, PV0.x
        y: MULADD R1.y,   R1.x, C0.y, PV0.y
        z: MULADD R1.z,   R1.x, C0.z, PV0.z
        w: MULADD R1.w,   R1.x, C0.w, PV0.w

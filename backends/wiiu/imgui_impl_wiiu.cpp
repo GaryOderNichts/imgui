@@ -6,6 +6,9 @@
 // Software keyboard
 #include <nn/swkbd.h>
 
+// USB Keyboard
+#include <nsyskbd/nsyskbd.h>
+
 // Wii U Data
 struct ImGui_ImplWiiU_Data
 {
@@ -16,6 +19,8 @@ struct ImGui_ImplWiiU_Data
     bool WantedTextInput;
     bool WasTouched;
 
+    int RealKeyboardAttached;
+
     ImGui_ImplWiiU_Data()   { memset((void*)this, 0, sizeof(*this)); }
 };
 
@@ -23,6 +28,212 @@ struct ImGui_ImplWiiU_Data
 static ImGui_ImplWiiU_Data* ImGui_ImplWiiU_GetBackendData()
 {
     return ImGui::GetCurrentContext() ? (ImGui_ImplWiiU_Data*)ImGui::GetIO().BackendPlatformUserData : NULL;
+}
+
+static void
+ImGui_ImplWiiU_USBKeyboard_AttachCallback(KBDAttachEvent *kde) {
+    ImGui_ImplWiiU_Data *bd = ImGui_ImplWiiU_GetBackendData();
+    IM_ASSERT(bd != nullptr && "Did you call ImGui_ImplWiiU_Init()?");
+    bd->RealKeyboardAttached++;
+}
+
+static void
+ImGui_ImplWiiU_USBKeyboard_DetachCallback(KBDAttachEvent *kde) {
+    ImGui_ImplWiiU_Data *bd = ImGui_ImplWiiU_GetBackendData();
+    IM_ASSERT(bd != nullptr && "Did you call ImGui_ImplWiiU_Init()?");
+    bd->RealKeyboardAttached--;
+    if (bd->RealKeyboardAttached < 0) {
+        bd->RealKeyboardAttached = 0;
+    }
+}
+
+ImGuiKey ImGui_ImplWiiU_USBKeyboard_ConvertHIDCodeToGuiKey(uint8_t key) {
+    switch (key) {
+        case 0x04:
+            return ImGuiKey_A;
+        case 0x05:
+            return ImGuiKey_B;
+        case 0x06:
+            return ImGuiKey_C;
+        case 0x07:
+            return ImGuiKey_D;
+        case 0x08:
+            return ImGuiKey_E;
+        case 0x09:
+            return ImGuiKey_F;
+        case 0x0A:
+            return ImGuiKey_G;
+        case 0x0B:
+            return ImGuiKey_H;
+        case 0x0C:
+            return ImGuiKey_I;
+        case 0x0D:
+            return ImGuiKey_J;
+        case 0x0E:
+            return ImGuiKey_K;
+        case 0x0F:
+            return ImGuiKey_L;
+        case 0x10:
+            return ImGuiKey_M;
+        case 0x11:
+            return ImGuiKey_N;
+        case 0x12:
+            return ImGuiKey_O;
+        case 0x13:
+            return ImGuiKey_P;
+        case 0x14:
+            return ImGuiKey_Q;
+        case 0x15:
+            return ImGuiKey_R;
+        case 0x16:
+            return ImGuiKey_S;
+        case 0x17:
+            return ImGuiKey_T;
+        case 0x18:
+            return ImGuiKey_U;
+        case 0x19:
+            return ImGuiKey_V;
+        case 0x1a:
+            return ImGuiKey_W;
+        case 0x1b:
+            return ImGuiKey_X;
+        case 0x1c:
+            return ImGuiKey_Y;
+        case 0x1d:
+            return ImGuiKey_Z;
+        case 0x1e:
+            return ImGuiKey_1;
+        case 0x1f:
+            return ImGuiKey_2;
+        case 0x20:
+            return ImGuiKey_3;
+        case 0x21:
+            return ImGuiKey_4;
+        case 0x22:
+            return ImGuiKey_5;
+        case 0x23:
+            return ImGuiKey_6;
+        case 0x24:
+            return ImGuiKey_7;
+        case 0x25:
+            return ImGuiKey_8;
+        case 0x26:
+            return ImGuiKey_9;
+        case 0x27:
+            return ImGuiKey_0;
+        case 0x28:
+            return ImGuiKey_Enter;
+        case 0x29:
+            return ImGuiKey_Escape;
+        case 0x2A:
+            return ImGuiKey_Backspace;
+        case 0x2B:
+            return ImGuiKey_Tab;
+        case 0x2c:
+            return ImGuiKey_Space;
+        case 0x2D:
+            return ImGuiKey_Minus;
+        case 0x2E:
+            return ImGuiKey_Equal;
+        case 0x2F:
+            return ImGuiKey_LeftBracket;
+        case 0x30:
+            return ImGuiKey_RightBracket;
+        case 0x31:
+            return ImGuiKey_Backslash;
+        case 0x33:
+            return ImGuiKey_Semicolon;
+        case 0x34:
+            return ImGuiKey_Apostrophe;
+        case 0x35:
+            return ImGuiKey_GraveAccent;
+        case 0x36:
+            return ImGuiKey_Comma;
+        case 0x37:
+            return ImGuiKey_Period;
+        case 0x38:
+            return ImGuiKey_Slash;
+        case 0x39:
+            return ImGuiKey_CapsLock;
+        case 0x3A:
+            return ImGuiKey_F1;
+        case 0x3B:
+            return ImGuiKey_F2;
+        case 0x3C:
+            return ImGuiKey_F3;
+        case 0x3D:
+            return ImGuiKey_F4;
+        case 0x3E:
+            return ImGuiKey_F5;
+        case 0x3F:
+            return ImGuiKey_F6;
+        case 0x40:
+            return ImGuiKey_F7;
+        case 0x41:
+            return ImGuiKey_F8;
+        case 0x42:
+            return ImGuiKey_F9;
+        case 0x43:
+            return ImGuiKey_F10;
+        case 0x44:
+            return ImGuiKey_F11;
+        case 0x45:
+            return ImGuiKey_F12;
+        case 0x46:
+            return ImGuiKey_PrintScreen;
+        case 0x47:
+            return ImGuiKey_ScrollLock;
+        case 0x48:
+            return ImGuiKey_Pause;
+        case 0x49:
+            return ImGuiKey_Insert;
+        case 0x4A:
+            return ImGuiKey_Home;
+        case 0x4b:
+            return ImGuiKey_PageUp;
+        case 0x4c:
+            return ImGuiKey_Delete;
+        case 0x4d:
+            return ImGuiKey_End;
+        case 0x4e:
+            return ImGuiKey_PageDown;
+        case 0x4f:
+            return ImGuiKey_RightArrow;
+        case 0x50:
+            return ImGuiKey_LeftArrow;
+        case 0x51:
+            return ImGuiKey_DownArrow;
+        case 0x52:
+            return ImGuiKey_UpArrow;
+        case 0xe0:
+            return ImGuiKey_LeftCtrl;
+        case 0xe1:
+            return ImGuiKey_LeftShift;
+        case 0xe2:
+            return ImGuiKey_LeftAlt;
+        case 0xe4:
+            return ImGuiKey_RightCtrl;
+        case 0xe5:
+            return ImGuiKey_RightShift;
+        case 0xe6:
+            return ImGuiKey_RightAlt;
+        default:
+            break;
+    }
+    return ImGuiKey_None;
+}
+
+static void
+ImGui_ImplWiiU_USBKeyboard_KeyCallback(KBDKeyEvent *event) {
+    ImGuiIO &io = ImGui::GetIO();
+    auto convertedKey = ImGui_ImplWiiU_USBKeyboard_ConvertHIDCodeToGuiKey(event->hidCode);
+
+    if (convertedKey != ImGuiKey_None) {
+        io.AddKeyEvent(convertedKey, event->isPressedDown);
+    }
+    if (event->isPressedDown) {
+        io.AddInputCharacterUTF16(event->asUTF16Character);
+    }
 }
 
 bool     ImGui_ImplWiiU_Init()
@@ -57,6 +268,9 @@ bool     ImGui_ImplWiiU_Init()
     bd->CreateArg = createArg;
     bd->AppearArg = appearArg;
 
+    bd->RealKeyboardAttached = 0;
+    KBDSetup(ImGui_ImplWiiU_USBKeyboard_AttachCallback, ImGui_ImplWiiU_USBKeyboard_DetachCallback, ImGui_ImplWiiU_USBKeyboard_KeyCallback);
+
     return true;
 }
 
@@ -77,6 +291,8 @@ void     ImGui_ImplWiiU_Shutdown()
         free(bd->CreateArg.fsClient);
         bd->CreateArg.fsClient = NULL;
     }
+
+    KBDTeardown();
 
     io.BackendPlatformName = NULL;
     io.BackendPlatformUserData = NULL;
@@ -243,7 +459,7 @@ bool     ImGui_ImplWiiU_ProcessInput(ImGui_ImplWiiU_ControllerInput* input)
     ImGuiIO& io = ImGui::GetIO();
 
     // Show keyboard if wanted
-    if (io.WantTextInput && !bd->WantedTextInput) 
+    if (bd->RealKeyboardAttached == 0 && io.WantTextInput && !bd->WantedTextInput)
     {
         // Open the keyboard for the controller which requested the text input
         bd->AppearArg.keyboardArg.configArg.controllerType = bd->LastController;

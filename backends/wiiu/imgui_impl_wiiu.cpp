@@ -11,6 +11,7 @@ struct ImGui_ImplWiiU_Data
 {
     nn::swkbd::CreateArg CreateArg;
     nn::swkbd::AppearArg AppearArg;
+    nn::swkbd::ControllerType LastController;
 
     bool WantedTextInput;
     bool WasTouched;
@@ -84,9 +85,6 @@ void     ImGui_ImplWiiU_Shutdown()
 
 static void ImGui_ImplWiiU_UpdateKeyboardInput(ImGui_ImplWiiU_ControllerInput* input)
 {
-    if (!input->vpad)
-        return;
-
     ImGuiIO& io = ImGui::GetIO();
 
     VPADGetTPCalibratedPoint(VPAD_CHAN_0, &input->vpad->tpNormal, &input->vpad->tpNormal);
@@ -141,6 +139,7 @@ static void ImGui_ImplWiiU_UpdateTouchInput(ImGui_ImplWiiU_ControllerInput* inpu
     {
         io.AddMouseButtonEvent(ImGuiMouseButton_Left, touch.touched);
         bd->WasTouched = touch.touched;
+        bd->LastController = nn::swkbd::ControllerType::DrcGamepad;
     }
 }
 
@@ -148,6 +147,7 @@ static void ImGui_ImplWiiU_UpdateTouchInput(ImGui_ImplWiiU_ControllerInput* inpu
 
 static void ImGui_ImplWiiU_UpdateControllerInput(ImGui_ImplWiiU_ControllerInput* input)
 {
+    ImGui_ImplWiiU_Data* bd = ImGui_ImplWiiU_GetBackendData();
     ImGuiIO& io = ImGui::GetIO();
     if ((io.ConfigFlags & ImGuiConfigFlags_NavEnableGamepad) == 0)
         return;
@@ -178,6 +178,9 @@ static void ImGui_ImplWiiU_UpdateControllerInput(ImGui_ImplWiiU_ControllerInput*
             break;
         case WPAD_EXT_CLASSIC:
             classic_buttons |= kpad->classic.hold;
+            if (classic_buttons & WPAD_CLASSIC_BUTTON_X)
+                bd->LastController = (nn::swkbd::ControllerType) i;
+
             stick_l_x += kpad->classic.leftStick.x;
             stick_l_y += kpad->classic.leftStick.y;
             stick_r_x += kpad->classic.rightStick.x;
@@ -185,6 +188,9 @@ static void ImGui_ImplWiiU_UpdateControllerInput(ImGui_ImplWiiU_ControllerInput*
             break;
         case WPAD_EXT_PRO_CONTROLLER:
             pro_buttons |= kpad->pro.hold;
+            if (pro_buttons & WPAD_PRO_BUTTON_X)
+                bd->LastController = (nn::swkbd::ControllerType) i;
+
             stick_l_x += kpad->pro.leftStick.x;
             stick_l_y += kpad->pro.leftStick.y;
             stick_r_x += kpad->pro.rightStick.x;
@@ -192,6 +198,9 @@ static void ImGui_ImplWiiU_UpdateControllerInput(ImGui_ImplWiiU_ControllerInput*
             break;
         }
     }
+
+    if (vpad_buttons & VPAD_BUTTON_X)
+        bd->LastController = nn::swkbd::ControllerType::DrcGamepad;
 
     io.AddKeyEvent(ImGuiKey_GamepadStart, (vpad_buttons & VPAD_BUTTON_PLUS) || (wpad_buttons & WPAD_BUTTON_PLUS) || (classic_buttons & WPAD_CLASSIC_BUTTON_PLUS) || (pro_buttons & WPAD_PRO_BUTTON_PLUS));
     io.AddKeyEvent(ImGuiKey_GamepadBack, (vpad_buttons & VPAD_BUTTON_MINUS) || (wpad_buttons & WPAD_BUTTON_MINUS) || (classic_buttons & WPAD_CLASSIC_BUTTON_MINUS) || (pro_buttons & WPAD_PRO_BUTTON_MINUS));
@@ -236,6 +245,9 @@ bool     ImGui_ImplWiiU_ProcessInput(ImGui_ImplWiiU_ControllerInput* input)
     // Show keyboard if wanted
     if (io.WantTextInput && !bd->WantedTextInput) 
     {
+        // Open the keyboard for the controller which requested the text input
+        bd->AppearArg.keyboardArg.configArg.controllerType = bd->LastController;
+
         if (nn::swkbd::GetStateInputForm() == nn::swkbd::State::Hidden)
             nn::swkbd::AppearInputForm(bd->AppearArg);
     }
@@ -257,13 +269,23 @@ bool     ImGui_ImplWiiU_ProcessInput(ImGui_ImplWiiU_ControllerInput* input)
     return false;
 }
 
-void     ImGui_ImplWiiU_DrawKeyboardOverlay(bool drawDRC)
+void     ImGui_ImplWiiU_DrawKeyboardOverlay(ImGui_ImplWiiU_KeyboardOverlayType type)
 {
+    ImGui_ImplWiiU_Data* bd = ImGui_ImplWiiU_GetBackendData();
+    IM_ASSERT(bd != NULL && "Did you call ImGui_ImplWiiU_Init()?");
+
     if (nn::swkbd::GetStateInputForm() != nn::swkbd::State::Hidden)
     {
-        if (drawDRC)
+        if (type == ImGui_KeyboardOverlay_Auto)
+        {
+            if (bd->LastController == nn::swkbd::ControllerType::DrcGamepad)
+                nn::swkbd::DrawDRC();
+            else
+                nn::swkbd::DrawTV();
+        }
+        else if (type == ImGui_KeyboardOverlay_DRC)
             nn::swkbd::DrawDRC();
-        else
+        else if (type == ImGui_KeyboardOverlay_TV)
             nn::swkbd::DrawTV();
     }
 }

@@ -129,7 +129,7 @@ int main(int, char**)
         // Render keyboard overlay
         GX2SetViewport(0, 0, io.DisplaySize.x, io.DisplaySize.y, 0.0f, 1.0f);
         GX2SetScissor(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-        ImGui_ImplWiiU_DrawKeyboardOverlay(true);
+        ImGui_ImplWiiU_DrawKeyboardOverlay();
 
         // Copy the TV buffer to the scanbuffers
         WHBGfxFinishRenderTV();

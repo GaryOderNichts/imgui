@@ -16,15 +16,6 @@
 // Include shader data
 #include "shaders/shader.h"
 
-// GX2 Texture / contains a texture and sampler
-struct ImGui_ImplGX2_Texture
-{
-    GX2Texture Texture;
-    GX2Sampler Sampler;
-
-    ImGui_ImplGX2_Texture() { memset(this, 0, sizeof(*this)); }
-};
-
 // GX2 Data
 struct ImGui_ImplGX2_Data
 {
@@ -213,9 +204,10 @@ void    ImGui_ImplGX2_RenderDrawData(ImDrawData* draw_data)
 
                 // Bind texture, Draw
                 ImGui_ImplGX2_Texture* tex = (ImGui_ImplGX2_Texture*) pcmd->GetTexID();
+                IM_ASSERT(tex && "TextureID cannot be NULL");
 
-                GX2SetPixelTexture(&tex->Texture, 0);
-                GX2SetPixelSampler(&tex->Sampler, 0);
+                GX2SetPixelTexture(tex->Texture, 0);
+                GX2SetPixelSampler(tex->Sampler, 0);
 
                 GX2DrawIndexedEx(GX2_PRIMITIVE_MODE_TRIANGLES, pcmd->ElemCount,
                     sizeof(ImDrawIdx) == 2 ? GX2_INDEX_TYPE_U16 : GX2_INDEX_TYPE_U32,
@@ -245,8 +237,9 @@ bool ImGui_ImplGX2_CreateFontsTexture()
 
     bd->FontTexture = IM_NEW(ImGui_ImplGX2_Texture)();
 
-    GX2Texture* tex = &bd->FontTexture->Texture;
+    GX2Texture* tex = IM_NEW(GX2Texture)();
     memset(tex, 0, sizeof(GX2Texture));
+    bd->FontTexture->Texture = tex;
 
     tex->surface.dim = GX2_SURFACE_DIM_TEXTURE_2D;
     tex->surface.use = GX2_SURFACE_USE_TEXTURE;
@@ -273,7 +266,8 @@ bool ImGui_ImplGX2_CreateFontsTexture()
 
     GX2RUnlockSurfaceEx(&tex->surface, 0, GX2R_RESOURCE_BIND_NONE);
 
-    GX2InitSampler(&bd->FontTexture->Sampler, GX2_TEX_CLAMP_MODE_CLAMP, GX2_TEX_XY_FILTER_MODE_LINEAR);
+    bd->FontTexture->Sampler = IM_NEW(GX2Sampler)();
+    GX2InitSampler(bd->FontTexture->Sampler, GX2_TEX_CLAMP_MODE_CLAMP, GX2_TEX_XY_FILTER_MODE_LINEAR);
 
     // Store our identifier
     io.Fonts->SetTexID((ImTextureID) bd->FontTexture);
@@ -287,8 +281,10 @@ void ImGui_ImplGX2_DestroyFontsTexture()
     ImGui_ImplGX2_Data* bd = ImGui_ImplGX2_GetBackendData();
     if (bd->FontTexture)
     {
-        GX2RDestroySurfaceEx(&bd->FontTexture->Texture.surface, GX2R_RESOURCE_BIND_NONE);
+        GX2RDestroySurfaceEx(&bd->FontTexture->Texture->surface, GX2R_RESOURCE_BIND_NONE);
         io.Fonts->SetTexID(0);
+        IM_DELETE(bd->FontTexture->Texture);
+        IM_DELETE(bd->FontTexture->Sampler);
         IM_DELETE(bd->FontTexture);
         bd->FontTexture = NULL;
     }

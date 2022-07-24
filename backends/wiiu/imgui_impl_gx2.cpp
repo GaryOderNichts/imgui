@@ -204,6 +204,10 @@ void    ImGui_ImplGX2_RenderDrawData(ImDrawData* draw_data)
                 if (clip_max.x <= clip_min.x || clip_max.y <= clip_min.y)
                     continue;
 
+                // Discard invalid draws to avoid GPU crash
+                if (clip_min.x < 0.0f || clip_min.y < 0.0f || clip_max.x > fb_width || clip_max.y > fb_height || !pcmd->ElemCount)
+                    continue;
+
                 // Apply scissor/clipping rectangle
                 GX2SetScissor((uint32_t)clip_min.x, (uint32_t)clip_min.y, (uint32_t)(clip_max.x - clip_min.x), (uint32_t)(clip_max.y - clip_min.y));
 

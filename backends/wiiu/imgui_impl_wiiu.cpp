@@ -6,6 +6,9 @@
 
 // Software keyboard
 #include <nn/swkbd.h>
+#include <nsyshid/hid.h>
+#include <malloc.h>
+#include <coreinit/debug.h>
 
 // Wii U Data
 struct ImGui_ImplWiiU_Data
@@ -17,6 +20,10 @@ struct ImGui_ImplWiiU_Data
     bool WantedTextInput;
     bool WasTouched;
 
+    bool MouseClientAdded;
+    HIDClient MouseHIDClient;
+    uint8_t *MouseMemory;
+
     ImGui_ImplWiiU_Data()   { memset((void*)this, 0, sizeof(*this)); }
 };
 
@@ -24,6 +31,74 @@ struct ImGui_ImplWiiU_Data
 static ImGui_ImplWiiU_Data* ImGui_ImplWiiU_GetBackendData()
 {
     return ImGui::GetCurrentContext() ? (ImGui_ImplWiiU_Data*)ImGui::GetIO().BackendPlatformUserData : NULL;
+}
+
+static void ImGui_ImplWiiU_MouseReadCallback(uint32_t handle, uint32_t error, uint8_t * buffer, uint32_t bytes_transferred, void *data) {
+    ImGui_ImplWiiU_Data *bd = ImGui_ImplWiiU_GetBackendData();
+    IM_ASSERT(bd != nullptr && "Did you call ImGui_ImplWiiU_Init()?");
+    if (error == 0) {
+        if(nn::swkbd::GetStateInputForm() == nn::swkbd::State::Hidden) {
+            ImGuiIO &io = ImGui::GetIO();
+            auto xpos = io.MousePos.x;
+            auto ypos = io.MousePos.y;
+
+            if (buffer[1] != 0 || buffer[2] != 0) {
+                io.MouseDrawCursor = true;
+
+                xpos += ((int8_t) buffer[1]) * 1.5f;
+                ypos += ((int8_t) buffer[2]) * 1.5f;
+
+                if (xpos < 0) {
+                    xpos = 0.0;
+                } else if (xpos > io.DisplaySize.x) {
+                    xpos = io.DisplaySize.x;
+                }
+
+                if (ypos < 0) {
+                    ypos = 0.0;
+                } else if (ypos > io.DisplaySize.y) {
+                    ypos = io.DisplaySize.y;
+                }
+
+                io.AddMousePosEvent(xpos, ypos);
+            }
+
+            io.AddMouseButtonEvent(ImGuiMouseButton_Left, buffer[0x00] & 1);
+            io.AddMouseButtonEvent(ImGuiMouseButton_Right, buffer[0x00] & 2);
+        }
+
+        HIDRead(handle, (uint8_t *) bd->MouseMemory, bytes_transferred, reinterpret_cast<HIDCallback>(ImGui_ImplWiiU_MouseReadCallback), nullptr);
+    } else {
+        HIDDelClient(&bd->MouseHIDClient);
+        bd->MouseClientAdded = false;
+    }
+}
+
+static int ImGui_ImplWiiU_MouseAttachCallback(HIDClient *client, HIDDevice *device, HIDAttachEvent attach) {
+    ImGui_ImplWiiU_Data *bd = ImGui_ImplWiiU_GetBackendData();
+    IM_ASSERT(bd != nullptr && "Did you call ImGui_ImplWiiU_Init()?");
+    if (attach) {
+        if (bd->MouseMemory) {
+            OSReport("Can't attach more than one mouse\n");
+            return 1;
+        } else {
+            if ((device->subClass == 1) && (device->protocol == 2)) {
+                HIDSetProtocol(device->handle, device->interfaceIndex, 2, nullptr, nullptr);
+                HIDSetIdle(device->handle, device->interfaceIndex, 0, nullptr, nullptr);
+
+                bd->MouseMemory = (uint8_t *) memalign(0x40, device->maxPacketSizeRx);
+
+                HIDRead(device->handle, (uint8_t *) bd->MouseMemory, device->maxPacketSizeRx, reinterpret_cast<HIDCallback>(ImGui_ImplWiiU_MouseReadCallback), nullptr);
+
+                return 1;
+            }
+        }
+    } else {
+        free(bd->MouseMemory);
+        bd->MouseMemory = nullptr;
+    }
+
+    return 0;
 }
 
 bool     ImGui_ImplWiiU_Init()
@@ -58,6 +133,10 @@ bool     ImGui_ImplWiiU_Init()
     bd->CreateArg = createArg;
     bd->AppearArg = appearArg;
 
+    HIDAddClient(&bd->MouseHIDClient, static_cast<HIDAttachCallback>(ImGui_ImplWiiU_MouseAttachCallback));
+
+    bd->MouseClientAdded = true;
+
     return true;
 }
 
@@ -78,6 +157,8 @@ void     ImGui_ImplWiiU_Shutdown()
         free(bd->CreateArg.fsClient);
         bd->CreateArg.fsClient = NULL;
     }
+
+    HIDDelClient(&bd->MouseHIDClient);
 
     io.BackendPlatformName = NULL;
     io.BackendPlatformUserData = NULL;
@@ -140,6 +221,7 @@ static void ImGui_ImplWiiU_UpdateTouchInput(ImGui_ImplWiiU_ControllerInput* inpu
         float scale_x = (io.DisplaySize.x / io.DisplayFramebufferScale.x) / 1280.0f;
         float scale_y = (io.DisplaySize.y / io.DisplayFramebufferScale.y) / 720.0f;
         io.AddMousePosEvent(touch.x * scale_x, touch.y * scale_y);
+        io.MouseDrawCursor = false;
     }
 
     if (touch.touched != bd->WasTouched)
@@ -288,6 +370,12 @@ bool     ImGui_ImplWiiU_ProcessInput(ImGui_ImplWiiU_ControllerInput* input)
 
     // Update gamepads
     ImGui_ImplWiiU_UpdateControllerInput(input);
+
+    // Check Mouse
+    if(!bd->MouseClientAdded) {
+        HIDAddClient(&bd->MouseHIDClient, static_cast<HIDAttachCallback>(ImGui_ImplWiiU_MouseAttachCallback));
+        bd->MouseClientAdded = true;
+    }
 
     return false;
 }
